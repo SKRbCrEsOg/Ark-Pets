@@ -115,7 +115,6 @@ public final class SettingsModule implements Controller<ArkHomeFX> {
     @FXML
     private CheckBox configEcoMode;
     @FXML
-    @FXML
     private ComboBox<NamedItem<String>> configWindowSystem;
     @FXML
     private Button configWindowSystemHelp;
