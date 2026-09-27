@@ -17,6 +17,8 @@ public interface KWinInterface extends DBusInterface {
 
     void Above(String uuid, boolean enable);
 
+    void NoBorder(String uuid, boolean enable);
+
     void Stick(String uuid, boolean enable);
 
     List<DetailsStruct> List();

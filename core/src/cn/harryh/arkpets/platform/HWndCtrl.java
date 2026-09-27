@@ -67,6 +67,13 @@ public abstract class HWndCtrl {
      */
     public abstract void setForeground();
 
+    /** Sets the window to be borderless (no title bar and frame).
+     * The default implementation does nothing; platforms that support it may override.
+     * @param enable Whether to make the window borderless.
+     */
+    public void setBorderless(boolean enable) {
+    }
+
     /** Sets the window's position without activating the window.
      * @param insertAfter The window to precede the positioned window in the Z order.
      * @param x The new position of the left side of the window, in client coordinates.

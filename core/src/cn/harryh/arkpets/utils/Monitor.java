@@ -29,6 +29,34 @@ public class Monitor {
         this.bbp = dm.bitsPerPixel;
     }
 
+    private Monitor(String name, int width, int height, int virtualX, int virtualY, int refreshRate, int bbp) {
+        this.name = name;
+        this.width = width;
+        this.height = height;
+        this.virtualX = virtualX;
+        this.virtualY = virtualY;
+        this.refreshRate = refreshRate;
+        this.bbp = bbp;
+    }
+
+    /** Returns a copy of this monitor whose geometry is divided by the given scale factor.
+     * On HiDPI compositors (e.g. Wayland with fractional scaling), GLFW reports the monitor
+     * in physical pixels while window coordinates are expressed in logical pixels. Converting
+     * the monitor geometry to logical pixels keeps the physics world aligned with window movement.
+     * @param scale The content scale factor, which must be positive.
+     * @return A scaled Monitor, or this instance when the scale is 1.
+     */
+    public Monitor scaled(float scale) {
+        if (scale <= 0f || Math.abs(scale - 1f) < 1e-3f)
+            return this;
+        return new Monitor(name,
+                Math.max(1, Math.round(width / scale)),
+                Math.max(1, Math.round(height / scale)),
+                Math.round(virtualX / scale),
+                Math.round(virtualY / scale),
+                refreshRate, bbp);
+    }
+
     public String getName() {
         return name;
     }

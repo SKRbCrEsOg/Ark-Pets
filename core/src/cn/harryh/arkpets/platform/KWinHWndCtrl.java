@@ -73,6 +73,15 @@ public class KWinHWndCtrl extends HWndCtrl {
     }
 
     @Override
+    public void setBorderless(boolean enable) {
+        try {
+            dBusInterface.NoBorder(hWnd, enable);
+        } catch (Throwable t) {
+            Logger.warn("System", "The KWin integration plugin does not support borderless windows: " + t.getMessage());
+        }
+    }
+
+    @Override
     public void sendMouseEvent(MouseEvent msg, int x, int y) {
 
     }

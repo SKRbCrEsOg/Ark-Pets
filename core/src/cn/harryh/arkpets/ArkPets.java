@@ -21,6 +21,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Graphics;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.GL20;
+import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -112,6 +113,7 @@ public class ArkPets extends InputApplicationAdaptor {
         // 5.Window style setup
         hWndMine = WindowSystem.findWindow(null, APP_TITLE);
         hWndMine.attachGLFWWindow((Lwjgl3Graphics) Gdx.graphics);
+        hWndMine.setBorderless(true);
         if (config.window_style_topmost)
             hWndMine.setTopmost(true);
         if (config.window_style_toolwindow)
@@ -471,18 +473,40 @@ public class ArkPets extends InputApplicationAdaptor {
             Logger.error("App", "Failed to get monitors information since no monitor has been found");
             throw new RuntimeException("Failed to refresh monitors config.");
         }
+        float scale = getWindowContentScale();
         plane.world.clear();
         boolean flag = true;
         for (Monitor m : monitors) {
             if (!flag) break;
             flag = config.display_multi_monitors;
-            float left = m.getVirtualX();
-            float right = left + m.getWidth();
-            float top = -m.getVirtualY();
-            float bottom = top - m.getHeight() + config.display_margin_bottom;
+            Monitor lm = m.scaled(scale);
+            float left = lm.getVirtualX();
+            float right = left + lm.getWidth();
+            float top = -lm.getVirtualY();
+            float bottom = top - lm.getHeight() + config.display_margin_bottom;
             plane.world.add(new Plane.RectArea(left, right, top, bottom));
         }
-        return monitors.get(0); // Return the primary monitor.
+        return monitors.get(0).scaled(scale); // Return the primary monitor.
+    }
+
+    /** Gets the display content scale factor of the current window.
+     * Wayland compositors with fractional/HiDPI scaling report monitor modes in physical
+     * pixels, while window coordinates use logical pixels. The content scale bridges the two.
+     * @return The content scale factor, always positive; 1 when unavailable or on non-Wayland platforms.
+     */
+    private float getWindowContentScale() {
+        try {
+            if (GLFW.glfwGetPlatform() != GLFW.GLFW_PLATFORM_WAYLAND)
+                return 1f;
+            long handle = ((Lwjgl3Graphics) Gdx.graphics).getWindow().getWindowHandle();
+            float[] scaleX = new float[1];
+            float[] scaleY = new float[1];
+            GLFW.glfwGetWindowContentScale(handle, scaleX, scaleY);
+            return scaleX[0] > 0f ? scaleX[0] : 1f;
+        } catch (Throwable t) {
+            Logger.debug("App", "Unable to determine the window content scale: " + t);
+            return 1f;
+        }
     }
 
     /* WINDOW WALKING RELATED */
