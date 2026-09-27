@@ -87,7 +87,7 @@
 
 ## 使用方法 <sub>Usage</sub>
 
-目前仅支持 Windows 7 及以上的图形操作系统。
+目前仅支持 Windows 7 及以上的图形操作系统（Linux aarch64 + KDE 的实验性支持见下文）。
 
 ### 快速上手
 
@@ -100,6 +100,23 @@
 > - 如需关闭已启动的桌宠，请右键单击桌宠或系统托盘中的 ArkPets 图标，然后选择 “退出”。
 > - 若无法在软件内下载模型，可以访问 [ArkModels 模型仓库](https://github.com/isHarryh/Ark-Models) 页面，手动下载模型压缩包后，在 “模型库管理” 面板点击 “导入压缩包” 按钮后导入模型。
 > - 如需将软件从 v2.x 或 v3.x 更新到更高版本，无需预先手动卸载，直接运行新版安装包即可。
+
+### 在 Linux（aarch64 + KDE Plasma）上安装
+
+> 实验性支持，已在 Debian 13 (aarch64) + KDE Plasma 6 (Wayland) 上验证。
+
+1. 下载发行包 `ArkPets-v3.13.1.zip`（自带运行时，无需系统 Java）、KWin 集成插件 `ArkPetsIntegration2.so` 与安装脚本 `install-arkpets.sh`。
+2. 运行安装脚本（可选 `--with-demo-model` 附带演示模型、`--autostart` 开机自启）：
+
+   ```bash
+   ./install-arkpets.sh --with-demo-model
+   ```
+
+   脚本会解压程序、生成配置（`window_system=KWIN`）、安装 KWin 插件并生成启动脚本。
+3. **注销并重新登录（或重启）一次**，让 KWin 加载集成插件。
+4. 启动桌宠：`~/.local/opt/ArkPets/start-arkpets.sh`；打开启动器以下载 / 选择模型、调整设置：`~/.local/opt/ArkPets/bin/ArkPets`。
+
+> 也可手动安装：解压 zip 后，将插件复制到 `$(qtpaths6 --query QT_INSTALL_PLUGINS)/kwin/plugins/`，并在配置文件中将 `window_system` 设为 `KWIN`。
 
 ### 更多特性
 
@@ -130,7 +147,7 @@
 - 如果您想添加自定义的模型，[点击查看](docs/CustomModel.md)说明。
 - 如果您想使用直播流软件捕捉桌宠窗口，可以在启动器 “选项” 页面禁用 “桌宠作为后台程序启动”。
 
-目前本程序不支持在其他操作系统运行。好消息是，对于 MacOS 和 Linux 的支持已处于开发阶段，敬请期待。
+目前本程序暂未正式支持其他操作系统。Linux（aarch64 + KDE）已有实验性安装包（见上文），MacOS 支持仍在开发中。
 
 ## 关 于 <sub>About</sub>
 
