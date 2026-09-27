@@ -113,7 +113,6 @@ public class ArkPets extends InputApplicationAdaptor {
         // 5.Window style setup
         hWndMine = WindowSystem.findWindow(null, APP_TITLE);
         hWndMine.attachGLFWWindow((Lwjgl3Graphics) Gdx.graphics);
-        hWndMine.setBorderless(true);
         if (config.window_style_topmost)
             hWndMine.setTopmost(true);
         if (config.window_style_toolwindow)
