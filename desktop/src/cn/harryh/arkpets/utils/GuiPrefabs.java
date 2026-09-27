@@ -188,12 +188,15 @@ public class GuiPrefabs {
         // https://bugs.openjdk.org/browse/JDK-8211294
         // https://github.com/javafxports/openjdk-jfx/issues/225
         // https://stackoverflow.com/questions/26098295/scrollpane-content-becomes-blurry-after-dragging
+        if (scrollPane.getSkin() == null)
+            return; // The skin is not created until the ScrollPane is laid out.
         try {
             Field field = ScrollPaneSkin.class.getDeclaredField("viewRect");
             field.setAccessible(true);
             StackPane stackPane = (StackPane) field.get(scrollPane.getSkin());
-            stackPane.setCache(false);
-        } catch (NoSuchFieldException | IllegalAccessException ignored) {
+            if (stackPane != null)
+                stackPane.setCache(false);
+        } catch (NoSuchFieldException | IllegalAccessException | NullPointerException ignored) {
         }
     }
 
