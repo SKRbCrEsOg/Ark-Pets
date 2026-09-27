@@ -58,11 +58,6 @@ public class KWinHWndCtrl extends HWndCtrl {
     }
 
     @Override
-    public void setTransparent(boolean enable) {
-
-    }
-
-    @Override
     public void setTaskbar(boolean enable) {
         dBusInterface.Stick(hWnd, enable);
     }
