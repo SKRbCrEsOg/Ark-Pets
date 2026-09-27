@@ -44,6 +44,14 @@ public class BootstrapLauncher {
     public static void main(String[] args) {
         // Disable assistive technologies
         System.setProperty("javax.accessibility.assistive_technologies", "");
+        // Linux HiDPI: make AWT (tray icon / popup menu) follow the compositor scale,
+        // otherwise Swing popups render too small and at wrong coordinates. The launch
+        // scripts/compositor expose the effective scale via ARKPETS_UI_SCALE.
+        if (System.getProperty("sun.java2d.uiScale") == null) {
+            String uiScale = System.getenv("ARKPETS_UI_SCALE");
+            if (uiScale != null && !uiScale.isEmpty())
+                System.setProperty("sun.java2d.uiScale", uiScale);
+        }
         ArgPending.argCache = args;
         // Config
         new ArgPending("--config", args) {

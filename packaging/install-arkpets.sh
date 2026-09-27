@@ -233,6 +233,13 @@ if [ -z "\${XAUTHORITY:-}" ]; then
 fi
 export XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS WAYLAND_DISPLAY DISPLAY XAUTHORITY
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=KDE
+# Effective display scale (for AWT popups/tray in the pet process).
+SCALE="\$(kscreen-doctor -o 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g' | grep -m1 -i 'Scale:' | grep -oE '[0-9]+([.][0-9]+)?' | head -1)"
+if [ -z "\$SCALE" ] && [ -n "\${XCURSOR_SIZE:-}" ] && [ "\$XCURSOR_SIZE" -gt 0 ] 2>/dev/null; then
+  SCALE=\$(( XCURSOR_SIZE / 24 )); [ "\$SCALE" -ge 1 ] || SCALE=1
+fi
+: "\${SCALE:=1}"
+export ARKPETS_UI_SCALE="\$SCALE"
 # GLFW treats XCURSOR_SIZE as the base cursor size and doubles it for HiDPI, but
 # KDE already exports it as size*scale; halve it so the in-window cursor matches.
 export XCURSOR_SIZE=\$(( \${XCURSOR_SIZE:-48} / 2 ))
@@ -266,9 +273,16 @@ fi
 if [ -z "\${XAUTHORITY:-}" ]; then
   for f in "\$XDG_RUNTIME_DIR"/xauth_*; do [ -f "\$f" ] && { XAUTHORITY="\$f"; break; }; done
 fi
-export XCURSOR_SIZE=\$(( \${XCURSOR_SIZE:-48} / 2 ))
 export XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS WAYLAND_DISPLAY DISPLAY XAUTHORITY
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=KDE
+# Effective display scale (for AWT popups/tray). Do NOT touch XCURSOR_SIZE here:
+# the GUI/GTK cursor already uses KDE's value; only pet processes halve it.
+SCALE="\$(kscreen-doctor -o 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g' | grep -m1 -i 'Scale:' | grep -oE '[0-9]+([.][0-9]+)?' | head -1)"
+if [ -z "\$SCALE" ] && [ -n "\${XCURSOR_SIZE:-}" ] && [ "\$XCURSOR_SIZE" -gt 0 ] 2>/dev/null; then
+  SCALE=\$(( XCURSOR_SIZE / 24 )); [ "\$SCALE" -ge 1 ] || SCALE=1
+fi
+: "\${SCALE:=1}"
+export ARKPETS_UI_SCALE="\$SCALE"
 cd "\$APP" || exit 1
 exec "\$APP/bin/ArkPets" "\$@"
 EOF

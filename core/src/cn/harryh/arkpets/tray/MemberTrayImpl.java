@@ -87,13 +87,7 @@ public class MemberTrayImpl extends MemberTray {
         icon.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseReleased(MouseEvent e) {
-                if (e.getButton() == 3 && e.isPopupTrigger())
-                    showDialog(e.getX() + 5, e.getY());
-            }
-
-            @Override
-            public void mousePressed(MouseEvent e) {
-                if (e.getButton() == 3 && e.isPopupTrigger())
+                if (SwingUtilities.isRightMouseButton(e) || e.isPopupTrigger())
                     showDialog(e.getX() + 5, e.getY());
             }
         });

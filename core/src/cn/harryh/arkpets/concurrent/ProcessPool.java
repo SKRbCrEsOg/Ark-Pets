@@ -62,6 +62,18 @@ public final class ProcessPool implements Executor {
             Map<String, String> env = builder.environment();
             env.remove("GDK_BACKEND");
             env.put("LIBDECOR_FORCE_CSD", "1");
+            // GLFW's Wayland backend treats XCURSOR_SIZE as the base cursor size and
+            // doubles it for HiDPI, while KDE already exports it as size*scale. Halve it
+            // for the pet process so its in-window cursor matches the system cursor.
+            String cursorSize = env.get("XCURSOR_SIZE");
+            if (cursorSize != null) {
+                try {
+                    int value = Integer.parseInt(cursorSize.trim());
+                    if (value > 1)
+                        env.put("XCURSOR_SIZE", Integer.toString(value / 2));
+                } catch (NumberFormatException ignored) {
+                }
+            }
             Process process = builder.inheritIO().start();
             int exitValue = process.waitFor();
             return new ProcessResult(exitValue, process.pid());
