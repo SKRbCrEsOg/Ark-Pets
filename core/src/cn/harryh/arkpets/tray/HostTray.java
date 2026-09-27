@@ -131,7 +131,12 @@ public class HostTray {
             return;
         /* Use `System.setProperty("sun.java2d.uiScale", "1")` can also avoid system scaling.
         Here we will adapt the coordinate for system scaling artificially. See below. */
-        AffineTransform at = popWindow.getGraphicsConfiguration().getDefaultTransform();
+        GraphicsConfiguration gc = popWindow.getGraphicsConfiguration();
+        if (gc == null) {
+            gc = GraphicsEnvironment.getLocalGraphicsEnvironment()
+                    .getDefaultScreenDevice().getDefaultConfiguration();
+        }
+        AffineTransform at = gc.getDefaultTransform();
         int scaledX = (int) (x / at.getScaleX());
         int scaledY = (int) (y / at.getScaleY());
 

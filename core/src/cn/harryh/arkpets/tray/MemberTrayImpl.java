@@ -213,7 +213,14 @@ public class MemberTrayImpl extends MemberTray {
     public synchronized void showDialog(int x, int y) {
         /* Use `System.setProperty("sun.java2d.uiScale", "1")` can also avoid system scaling.
         Here we will adapt the coordinate for system scaling artificially. See below. */
-        AffineTransform at = popWindow.getGraphicsConfiguration().getDefaultTransform();
+        GraphicsConfiguration gc = popWindow.getGraphicsConfiguration();
+        if (gc == null) {
+            // The dialog has no peer yet (e.g. on Wayland before it is shown); fall back
+            // to the default screen so the popup still appears.
+            gc = GraphicsEnvironment.getLocalGraphicsEnvironment()
+                    .getDefaultScreenDevice().getDefaultConfiguration();
+        }
+        AffineTransform at = gc.getDefaultTransform();
         int scaledX = (int) (x / at.getScaleX());
         int scaledY = (int) (y / at.getScaleY());
 
