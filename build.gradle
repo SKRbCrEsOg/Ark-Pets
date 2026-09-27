@@ -42,7 +42,7 @@ allprojects {
         if (forceJavaFXPlatform.empty) {
             switch (OperatingSystem.current()) {
                 case OperatingSystem.LINUX:
-                    javaFXPlatform = "linux"
+                    javaFXPlatform = isArm ? "linux-aarch64" : "linux"
                     break
                 case OperatingSystem.WINDOWS:
                     javaFXPlatform = isX64 ? "win" : "win-x86"
@@ -57,7 +57,7 @@ allprojects {
         if (forceLWJGLPlatform.empty) {
             switch (OperatingSystem.current()) {
                 case OperatingSystem.LINUX:
-                    lwjglPlatform = "natives-linux"
+                    lwjglPlatform = isArm ? "natives-linux-arm64" : "natives-linux"
                     break
                 case OperatingSystem.WINDOWS:
                     lwjglPlatform = isX64 ? "natives-windows" : "natives-windows-x86"
@@ -68,6 +68,10 @@ allprojects {
             }
         } else {
             lwjglPlatform = forceLWJGLPlatform
+        }
+        // JavaFX does not publish linux-aarch64 artifacts before 23; use 23+ there.
+        if (isArm && OperatingSystem.current() == OperatingSystem.LINUX) {
+            javaFXVersion = "23.0.1"
         }
     }
 
