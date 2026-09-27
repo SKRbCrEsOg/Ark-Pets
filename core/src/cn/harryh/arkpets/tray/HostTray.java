@@ -6,6 +6,7 @@ package cn.harryh.arkpets.tray;
 import cn.harryh.arkpets.Const;
 import cn.harryh.arkpets.utils.Logger;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -83,15 +84,39 @@ public class HostTray {
             popMenu.add(optExit);
             popMenu.setSize(100, 24 * popMenu.getSubElements().length);
 
-            Image image = Toolkit.getDefaultToolkit().getImage(HostTray.class.getResource(Const.iconFilePng));
+            Image image;
+            try {
+                image = ImageIO.read(HostTray.class.getResource(Const.iconFilePng));
+            } catch (Exception ex) {
+                image = Toolkit.getDefaultToolkit().getImage(HostTray.class.getResource(Const.iconFilePng));
+            }
+            image = scaleForTray(image);
             trayIcon = new TrayIcon(image, "ArkPets");
-            trayIcon.setImageAutoSize(true);
+            trayIcon.setImageAutoSize(false);
 
             trayIcon.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseReleased(MouseEvent e) {
-                    if (SwingUtilities.isRightMouseButton(e) || e.isPopupTrigger())
-                        showDialog(e.getX() + 5, e.getY());
+                    handlePopup(e);
+                }
+
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    handlePopup(e);
+                }
+
+                private void handlePopup(MouseEvent e) {
+                    if (SwingUtilities.isRightMouseButton(e) || e.isPopupTrigger()) {
+                        Logger.info("HostTray", "Tray icon popup requested");
+                        Point p;
+                        PointerInfo info = MouseInfo.getPointerInfo();
+                        if (info != null) {
+                            p = info.getLocation();
+                        } else {
+                            p = new Point(e.getX(), e.getY());
+                        }
+                        showDialog(p.x + 5, p.y);
+                    }
                 }
             });
             trayIcon.addMouseListener(new MouseAdapter() {
@@ -138,6 +163,22 @@ public class HostTray {
         popWindow.setVisible(true);
         popWindow.setLocation(scaledX, scaledY - popMenu.getHeight());
         popMenu.show(popWindow, 0, 0);
+    }
+
+    /** Scales an image to the system tray icon size (explicit redraw; lazy
+     * getScaledInstance is not honored by the Linux tray backend). */
+    private static Image scaleForTray(Image source) {
+        Dimension traySize = SystemTray.getSystemTray().getTrayIconSize();
+        int w = traySize == null ? 24 : Math.max(1, traySize.width);
+        int h = traySize == null ? 24 : Math.max(1, traySize.height);
+        Logger.debug("HostTray", "Tray icon size " + w + "x" + h);
+        java.awt.image.BufferedImage target =
+                new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = target.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(source, 0, 0, w, h, null);
+        g.dispose();
+        return target;
     }
 
     public void showStage() {

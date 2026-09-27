@@ -11,6 +11,7 @@ import cn.harryh.arkpets.concurrent.SocketSession;
 import cn.harryh.arkpets.utils.Logger;
 import com.badlogic.gdx.Gdx;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -78,20 +79,73 @@ public class MemberTrayImpl extends MemberTray {
 
     private TrayIcon getTrayIcon(Image image) {
         try {
+            // Scale to the tray cell size; KDE's StatusNotifier/XEmbed proxy ignores
+            // setImageAutoSize and would otherwise crop the large source image.
+            image = scaleForTray(image);
             icon = new TrayIcon(image, name);
         } catch (Exception e) {
             Logger.error("MemberTray", "Unable to apply MemberTray icon, details see below.", e);
             return icon;
         }
-        icon.setImageAutoSize(true);
+        icon.setImageAutoSize(false);
         icon.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseReleased(MouseEvent e) {
-                if (SwingUtilities.isRightMouseButton(e) || e.isPopupTrigger())
-                    showDialog(e.getX() + 5, e.getY());
+                handlePopup(e);
+            }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
+                handlePopup(e);
+            }
+
+            private void handlePopup(MouseEvent e) {
+                if (SwingUtilities.isRightMouseButton(e) || e.isPopupTrigger()) {
+                    Logger.info("MemberTray", "Tray icon popup requested");
+                    Point p = pointerLocation(e);
+                    showDialog(p.x + 5, p.y);
+                }
             }
         });
         return icon;
+    }
+
+    /** Scales an image to the system tray icon size (explicit redraw; lazy
+     * getScaledInstance is not honored by the Linux tray backend). */
+    private static Image scaleForTray(Image source) {
+        Dimension traySize = SystemTray.getSystemTray().getTrayIconSize();
+        int w = traySize == null ? 24 : Math.max(1, traySize.width);
+        int h = traySize == null ? 24 : Math.max(1, traySize.height);
+        Logger.debug("MemberTray", "Tray icon size " + w + "x" + h);
+        java.awt.image.BufferedImage target =
+                new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = target.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(source, 0, 0, w, h, null);
+        g.dispose();
+        return target;
+    }
+
+    /** Loads the tray icon image synchronously (Toolkit.getImage is async and would
+     * yield a blank image when scaled immediately). */
+    private static Image loadIcon() {
+        try {
+            return ImageIO.read(MemberTrayImpl.class.getResource(iconFilePng));
+        } catch (Exception e) {
+            Logger.error("MemberTray", "Failed to load the tray icon image, details see below.", e);
+            return Toolkit.getDefaultToolkit().createImage(MemberTrayImpl.class.getResource(iconFilePng));
+        }
+    }
+
+    /** Gets the pointer's screen location, falling back to the event coordinates. */
+    private static Point pointerLocation(MouseEvent e) {
+        try {
+            PointerInfo info = MouseInfo.getPointerInfo();
+            if (info != null)
+                return info.getLocation();
+        } catch (Exception ignored) {
+        }
+        return new Point(e.getX(), e.getY());
     }
 
     @Override
@@ -181,7 +235,7 @@ public class MemberTrayImpl extends MemberTray {
     public void onDisconnected() {
         // When connection was broken:
         Logger.info("MemberTray", "Integrated tray service disconnected");
-        Image image = Toolkit.getDefaultToolkit().createImage(getClass().getResource(iconFilePng));
+        Image image = loadIcon();
         TrayIcon icon = getTrayIcon(image);
 
         // Add the ISOLATED tray icon to the system tray.
