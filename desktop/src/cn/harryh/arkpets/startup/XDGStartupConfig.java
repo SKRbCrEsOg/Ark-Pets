@@ -21,8 +21,8 @@ public class XDGStartupConfig extends StartupConfig {
     public XDGStartupConfig() {
         try {
             File startupDir = new File(System.getProperty("user.home") + "/.config/autostart");
-            if (!startupDir.isDirectory())
-                throw new FileNotFoundException("Startup dir not found: " + startupDir.getAbsolutePath());
+            if (!startupDir.isDirectory() && !startupDir.mkdirs())
+                throw new FileNotFoundException("Startup dir not found and cannot be created: " + startupDir.getAbsolutePath());
             if (!new File(startupTarget).exists())
                 throw new FileNotFoundException("Executable not found.");
             this.desktopContent = new String(XDGStartupConfig.class.getResourceAsStream("/utils/xdgstartup.desktop").readAllBytes());
