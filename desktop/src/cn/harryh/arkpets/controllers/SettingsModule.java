@@ -392,20 +392,43 @@ public final class SettingsModule implements Controller<ArkHomeFX> {
                             "下次开机时将会自动生成您最后一次启动的桌宠。",
                             null).show();
                 } else {
-                    if (!startup.isStartupAvailable())
+                    final String home = System.getProperty("user.home");
+                    final String dirHint = Const.isMac ? home + "/Library/LaunchAgents" : home + "/.config/autostart";
+                    if (!startup.isStartupAvailable()) {
+                        String reason;
+                        String advice;
+                        if (Const.isLinux) {
+                            reason = "无法写入用户的自启动目录。";
+                            advice = "请确认以下两点：\n"
+                                    + "1. " + dirHint + " 目录可以被创建，且当前用户对其有写权限；\n"
+                                    + "2. 从 ArkPets 的安装目录启动启动器，而不是其他工作目录。\n"
+                                    + "提示：使用 install-arkpets.sh 并加上 --autostart 安装时，该目录会自动创建。";
+                        } else if (Const.isMac) {
+                            reason = "无法写入系统的自启动目录。";
+                            advice = "请确认以下两点：\n"
+                                    + "1. " + dirHint + " 目录可以被创建，且当前用户对其有写权限；\n"
+                                    + "2. 从 ArkPets 的安装目录启动启动器，而不是其他工作目录。";
+                        } else {
+                            reason = "无法确认目标程序的位置，其原因和相关解决方案如下：";
+                            advice = "为确保自启动服务的稳定性，直接打开的ArkPets的\".jar\"版启动器，是不支持配置自启动的。请使用exe版的安装包安装ArkPets后运行，或使用zip版的压缩包解压程序文件后运行。另外，当您使用错误的工作目录运行启动器时也可能出现此情况。";
+                        }
                         GuiPrefabs.Dialogs.createCommonDialog(app.body,
                                 GuiPrefabs.Icons.getIcon(GuiPrefabs.Icons.SVG_WARNING_ALT, GuiPrefabs.COLOR_WARNING),
                                 "开机自启动",
                                 "开机自启动设置失败。",
-                                "无法确认目标程序的位置，其原因和相关解决方案如下：",
-                                "为确保自启动服务的稳定性，直接打开的ArkPets的\".jar\"版启动器，是不支持配置自启动的。请使用exe版的安装包安装ArkPets后运行，或使用zip版的压缩包解压程序文件后运行。另外，当您使用错误的工作目录运行启动器时也可能出现此情况。").show();
-                    else
+                                reason,
+                                advice).show();
+                    } else {
+                        String advice = Const.isWindows
+                                ? "这有可能是由于权限不足导致的。请尝试关闭反病毒软件，并以管理员权限运行启动器。"
+                                : "这有可能是由于权限不足导致的。请检查 " + dirHint + " 的写权限。";
                         GuiPrefabs.Dialogs.createCommonDialog(app.body,
                                 GuiPrefabs.Icons.getIcon(GuiPrefabs.Icons.SVG_WARNING_ALT, GuiPrefabs.COLOR_WARNING),
                                 "开机自启动",
                                 "开机自启动设置失败。",
                                 "无法写入系统的启动目录，其原因可参见日志文件。",
-                                "这有可能是由于权限不足导致的。请尝试关闭反病毒软件，并以管理员权限运行启动器。").show();
+                                advice).show();
+                    }
                     configAutoStartup.setSelected(false);
                 }
             } else {
