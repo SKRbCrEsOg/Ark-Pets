@@ -62,27 +62,39 @@ public class KWinPluginCheckTask extends EnvCheckTask {
         }
         try {
             String result = IOUtils.CommandUtil.runCommand("plasmashell --version", null, null);
+            if (result == null) {
+                reason = "无法获取 Plasma 版本";
+                detail = "无法执行 plasmashell --version，请确认当前处于 KDE Plasma 会话。";
+                return false;
+            }
             Pattern pattern = Pattern.compile("plasmashell (\\d+)");
-            if (result == null) return false;
             Matcher matcher = pattern.matcher(result);
-            if (matcher.find()) {
-                int ver = Integer.parseInt(matcher.group(1));
-                if (ver == 5) { // Plasma 5.x
-                    reason = "不支持 KDE 5 Wayland";
-                    detail = "桌宠不支持在 KDE 5 Wayland 会话下运行，请使用 X11 会话。";
-                    return false;
-                }
-            } else {
+            if (!matcher.find()) {
+                reason = "无法获取 Plasma 版本";
+                detail = "无法解析 plasmashell --version 的输出：" + result.trim();
+                return false;
+            }
+            int ver = Integer.parseInt(matcher.group(1));
+            if (ver == 5) { // Plasma 5.x
+                reason = "不支持 KDE 5 Wayland";
+                detail = "桌宠不支持在 KDE 5 Wayland 会话下运行，请使用 X11 会话。";
                 return false;
             }
         } catch (IOException e) {
-            Logger.error("EnvCheck", "Failed to get KDE plugin info", e);
+            Logger.error("EnvCheck", "Failed to get Plasma version", e);
+            reason = "无法获取 Plasma 版本";
+            detail = "执行 plasmashell --version 时发生错误：" + e.getMessage();
             return false;
         }
         String pluginName = Const.kdePluginName + Const.kdePluginVersion;
         if (!availableList.contains(pluginName)) {
             reason = "安装 KDE 集成插件";
-            detail = "当前系统未找到 KDE 集成插件。\n由于不同 Linux 发行版之间 KDE/Qt 版本不一致，请前往 https://github.com/litwak913/Ark-Pets-Integration 并根据说明进行集成插件的编译和安装。";
+            detail = "当前系统未找到 KDE 集成插件（" + pluginName + "）。\n"
+                    + "注意：KWin 仅在启动时扫描插件目录，若你刚刚安装或更新过插件，"
+                    + "请先注销并重新登录（或重启）一次再试。\n"
+                    + "若仍未找到，由于不同 Linux 发行版之间 KDE/Qt 版本不一致，"
+                    + "请前往 https://github.com/litwak913/Ark-Pets-Integration "
+                    + "并根据说明编译和安装与当前 KWin 版本匹配的集成插件。";
             return false;
         }
         return true;
