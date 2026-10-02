@@ -4,6 +4,7 @@
 package cn.harryh.arkpets.tray;
 
 import cn.harryh.arkpets.ArkPets;
+import cn.harryh.arkpets.Const;
 import cn.harryh.arkpets.animations.AnimData;
 import cn.harryh.arkpets.concurrent.SocketClient;
 import cn.harryh.arkpets.concurrent.SocketData;
@@ -31,6 +32,9 @@ public class MemberTrayImpl extends MemberTray {
     private final JPopupMenu popMenu;
     private TrayIcon icon;
     public AnimData keepAnim;
+
+    /** The native Linux tray backend, used instead of {@link #icon} when available. */
+    private StatusNotifierTray sniTray;
 
     /** Initializes a per-character tray icon instance for an ArkPets. <br/>
      * Must be used after Gdx.app was initialized.
@@ -236,8 +240,34 @@ public class MemberTrayImpl extends MemberTray {
         // When connection was broken:
         Logger.info("MemberTray", "Integrated tray service disconnected");
         Image image = loadIcon();
-        TrayIcon icon = getTrayIcon(image);
 
+        /* Prefer a native StatusNotifierItem on Linux. Java AWT can only use the legacy
+        XEmbed protocol there, and KDE's xembedsniproxy bridges it without forwarding any
+        mouse event to Java clients (KDE bug 498824) - such an icon is unresponsive. */
+        if (Const.isLinux) {
+            sniTray = StatusNotifierTray.register(name, name, image, new StatusNotifierTray.Handler() {
+                @Override
+                public void onActivate(int x, int y) {
+                    showDialogAt(x, y);
+                }
+
+                @Override
+                public void onContextMenu(int x, int y) {
+                    showDialogAt(x, y);
+                }
+
+                @Override
+                public void onSecondaryActivate(int x, int y) {
+                    showDialogAt(x, y);
+                }
+            });
+            if (sniTray != null) {
+                Logger.info("MemberTray", "Isolated StatusNotifierItem applied");
+                return;
+            }
+        }
+
+        icon = getTrayIcon(image);
         // Add the ISOLATED tray icon to the system tray.
         try {
             SystemTray.getSystemTray().add(icon);
@@ -269,11 +299,17 @@ public class MemberTrayImpl extends MemberTray {
                     .getDefaultScreenDevice().getDefaultConfiguration();
         }
         AffineTransform at = gc.getDefaultTransform();
-        int scaledX = (int) (x / at.getScaleX());
-        int scaledY = (int) (y / at.getScaleY());
+        // AWT reports the pointer in device pixels; undo the UI scale to get the logical
+        // coordinates that the popup window is positioned with.
+        showDialogAt((int) (x / at.getScaleX()), (int) (y / at.getScaleY()));
+    }
 
+    /** Shows the menu at a logical screen position, as reported by the compositor
+     * through the StatusNotifierItem protocol.
+     */
+    public synchronized void showDialogAt(int x, int y) {
         // Show the JDialog together with the JPopupMenu.
-        popWindow.setLocation(scaledX, scaledY - popMenu.getHeight());
+        popWindow.setLocation(x, y - popMenu.getHeight());
         popWindow.setVisible(true);
         popMenu.show(popWindow, 0, 0);
         Logger.debug("MemberTray", "Shown @ " + x + ", " + y);

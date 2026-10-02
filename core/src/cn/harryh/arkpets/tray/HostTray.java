@@ -23,6 +23,9 @@ public class HostTray {
     protected boolean initialized = false;
     protected Map<UUID, MemberTray> arkPetTrays = new HashMap<>();
 
+    /** The native Linux tray backend, used instead of {@link #trayIcon} when available. */
+    private StatusNotifierTray sniTray;
+
     private JDialog popWindow;
     private JPopupMenu popMenu;
     private JMenu playerMenu;
@@ -84,12 +87,7 @@ public class HostTray {
             popMenu.add(optExit);
             popMenu.setSize(100, 24 * popMenu.getSubElements().length);
 
-            Image image;
-            try {
-                image = ImageIO.read(HostTray.class.getResource(Const.iconFilePng));
-            } catch (Exception ex) {
-                image = Toolkit.getDefaultToolkit().getImage(HostTray.class.getResource(Const.iconFilePng));
-            }
+            Image image = loadIcon();
             image = scaleForTray(image);
             trayIcon = new TrayIcon(image, "ArkPets");
             trayIcon.setImageAutoSize(false);
@@ -136,6 +134,35 @@ public class HostTray {
     public void applyTrayIcon() {
         if (initialized)
             return;
+        /* Prefer a native StatusNotifierItem on Linux. Java AWT can only use the legacy
+        XEmbed protocol there, and KDE's xembedsniproxy bridges it without forwarding any
+        mouse event to Java clients (KDE bug 498824) - such an icon is unresponsive, so
+        the aggregated pet menus could never be reached. */
+        if (Const.isLinux) {
+            sniTray = StatusNotifierTray.register(Const.appName, Const.appName, loadIcon(),
+                    new StatusNotifierTray.Handler() {
+                        @Override
+                        public void onActivate(int x, int y) {
+                            showStage();
+                        }
+
+                        @Override
+                        public void onContextMenu(int x, int y) {
+                            showDialogAt(x, y);
+                        }
+
+                        @Override
+                        public void onSecondaryActivate(int x, int y) {
+                            showStage();
+                        }
+                    });
+            if (sniTray != null) {
+                initialized = true;
+                return;
+            }
+        }
+        if (trayIcon == null)
+            return;
         try {
             SystemTray.getSystemTray().add(trayIcon);
             Logger.info("HostTray", "HostTray icon applied");
@@ -145,9 +172,18 @@ public class HostTray {
         }
     }
 
+    /** Loads the tray icon image synchronously (Toolkit.getImage is async and would
+     * yield a blank image when scaled immediately). */
+    private static Image loadIcon() {
+        try {
+            return ImageIO.read(HostTray.class.getResource(Const.iconFilePng));
+        } catch (Exception e) {
+            Logger.error("HostTray", "Failed to load the tray icon image, details see below.", e);
+            return Toolkit.getDefaultToolkit().createImage(HostTray.class.getResource(Const.iconFilePng));
+        }
+    }
+
     public void showDialog(int x, int y) {
-        if (!initialized)
-            return;
         /* Use `System.setProperty("sun.java2d.uiScale", "1")` can also avoid system scaling.
         Here we will adapt the coordinate for system scaling artificially. See below. */
         GraphicsConfiguration gc = popWindow.getGraphicsConfiguration();
@@ -156,12 +192,20 @@ public class HostTray {
                     .getDefaultScreenDevice().getDefaultConfiguration();
         }
         AffineTransform at = gc.getDefaultTransform();
-        int scaledX = (int) (x / at.getScaleX());
-        int scaledY = (int) (y / at.getScaleY());
+        // AWT reports the pointer in device pixels; undo the UI scale to get the logical
+        // coordinates that the popup window is positioned with.
+        showDialogAt((int) (x / at.getScaleX()), (int) (y / at.getScaleY()));
+    }
 
+    /** Shows the menu at a logical screen position, as reported by the compositor
+     * through the StatusNotifierItem protocol.
+     */
+    public void showDialogAt(int x, int y) {
+        if (!initialized)
+            return;
         // Show the JDialog together with the JPopupMenu.
         popWindow.setVisible(true);
-        popWindow.setLocation(scaledX, scaledY - popMenu.getHeight());
+        popWindow.setLocation(x, y - popMenu.getHeight());
         popMenu.show(popWindow, 0, 0);
     }
 
