@@ -5,6 +5,7 @@ package cn.harryh.arkpets;
 
 import cn.harryh.arkpets.controllers.Titlebar;
 import cn.harryh.arkpets.guitasks.envchecker.WinGraphicsEnvCheckTask;
+import cn.harryh.arkpets.platform.CursorEnvironment;
 import cn.harryh.arkpets.platform.WindowSystem;
 import cn.harryh.arkpets.telemetry.CorePerformanceSampler;
 import cn.harryh.arkpets.telemetry.HeartbeatSession;
@@ -104,6 +105,9 @@ public class BootstrapLauncher {
         if (!(temp.exists() || temp.mkdir())) {
             Logger.error("System", "Failed to create the temporary directory.");
         }
+        // Make GLFW use the cursor the user configured. Must happen before GLFW is
+        // initialised, so it is done for both the launcher and the pet paths.
+        CursorEnvironment.apply();
         // If requested to start the core app directly
         if (isDirectStart) {
             startCore(appConfig);
