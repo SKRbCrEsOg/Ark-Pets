@@ -260,7 +260,8 @@ public class MemberTrayImpl extends MemberTray {
                 public void onSecondaryActivate(int x, int y) {
                     showDialogAt(x, y);
                 }
-            });
+            },
+            () -> popMenu);
             if (sniTray != null) {
                 Logger.info("MemberTray", "Isolated StatusNotifierItem applied");
                 return;

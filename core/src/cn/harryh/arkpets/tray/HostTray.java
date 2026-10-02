@@ -155,7 +155,8 @@ public class HostTray {
                         public void onSecondaryActivate(int x, int y) {
                             showStage();
                         }
-                    });
+                    },
+                    () -> popMenu);
             if (sniTray != null) {
                 initialized = true;
                 return;

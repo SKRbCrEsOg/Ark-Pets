@@ -5,6 +5,7 @@ package cn.harryh.arkpets.tray;
 
 import cn.harryh.arkpets.natives.StatusNotifierItem;
 import cn.harryh.arkpets.utils.Logger;
+import org.freedesktop.dbus.ObjectPath;
 import org.freedesktop.dbus.annotations.DBusInterfaceName;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
@@ -13,6 +14,7 @@ import org.freedesktop.dbus.types.Variant;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.function.Supplier;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,9 +32,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * can ever be opened and no action can be forwarded to the pets.
  * <p>
  * Registering a StatusNotifierItem ourselves puts us on the native tray path: the shell
- * talks to <em>our</em> D-Bus object directly. Because we advertise no DBusMenu, KDE
- * falls back to calling {@link #ContextMenu(int, int)} with the pointer position, which
- * is all the existing Swing menus need.
+ * talks to <em>our</em> D-Bus object directly. The Swing menu is additionally exported as
+ * a {@link SwingDBusMenu} so that hosts which render tray menus themselves (KDE Plasma,
+ * GNOME Shell, Waybar, ...) can show it. Hosts that find no menu keep calling
+ * {@link #ContextMenu(int, int)} with the pointer position instead, so both paths work.
  * <p>
  * See the <a href="https://www.freedesktop.org/wiki/Specifications/StatusNotifierItem/">
  * StatusNotifierItem specification</a>.
@@ -52,6 +55,8 @@ public class StatusNotifierTray implements StatusNotifierItem {
     private static final String WATCHER_PATH        = "/StatusNotifierWatcher";
     private static final int[]  ICON_SIZES          = {16, 22, 24, 32, 48};
     private static final AtomicInteger INSTANCE_SEQ = new AtomicInteger();
+    /** The Menu property value telling the host to call ContextMenu() instead of using a DBusMenu. */
+    private static final String NO_MENU = "/NO_DBUSMENU";
 
     /** The D-Bus side of {@code org.kde.StatusNotifierWatcher}. */
     @DBusInterfaceName("org.kde.StatusNotifierWatcher")
@@ -66,12 +71,16 @@ public class StatusNotifierTray implements StatusNotifierItem {
 
     private DBusConnection connection;
     private String busName;
+    private SwingDBusMenu menu;
 
-    private StatusNotifierTray(String id, String title, List<IconPixmap> pixmaps, Handler handler) {
+    private StatusNotifierTray(String id, String title, List<IconPixmap> pixmaps, Handler handler,
+                               Supplier<JPopupMenu> menuSupplier) {
         this.id = id;
         this.title = title;
         this.pixmaps = pixmaps;
         this.handler = handler;
+        if (menuSupplier != null)
+            this.menu = new SwingDBusMenu(menuSupplier);
     }
 
     /** Registers a StatusNotifierItem with the current desktop's tray watcher.
@@ -79,13 +88,17 @@ public class StatusNotifierTray implements StatusNotifierItem {
      * @param title The item title shown as a tooltip.
      * @param icon The icon image, which must be at least {@code 48x48}.
      * @param handler The callback receiving tray events.
+     * @param menuSupplier Supplies the Swing menu to export as a DBusMenu so that hosts
+     *                     rendering menus themselves can show it; may be null, in which
+     *                     case only the {@code ContextMenu} callback is available.
      * @return The registered instance, or null when this desktop has no
      *         StatusNotifierWatcher or registration failed; callers should then fall
      *         back to the AWT system tray.
      */
-    public static StatusNotifierTray register(String id, String title, Image icon, Handler handler) {
+    public static StatusNotifierTray register(String id, String title, Image icon, Handler handler,
+                                              Supplier<JPopupMenu> menuSupplier) {
         try {
-            StatusNotifierTray tray = new StatusNotifierTray(id, title, toPixmaps(icon), handler);
+            StatusNotifierTray tray = new StatusNotifierTray(id, title, toPixmaps(icon), handler, menuSupplier);
             tray.doRegister();
             return tray;
         } catch (Throwable t) {
@@ -99,10 +112,13 @@ public class StatusNotifierTray implements StatusNotifierItem {
         busName = "org.kde.StatusNotifierItem-" + ProcessHandle.current().pid() + "-" + INSTANCE_SEQ.incrementAndGet();
         connection.requestBusName(busName);
         connection.exportObject(ITEM_PATH, this);
+        if (menu != null)
+            connection.exportObject(SwingDBusMenu.MENU_PATH, menu);
         StatusNotifierWatcher watcher =
                 connection.getRemoteObject(WATCHER_SERVICE, WATCHER_PATH, StatusNotifierWatcher.class);
         watcher.RegisterStatusNotifierItem(busName);
-        Logger.info("Tray", "StatusNotifierItem registered as " + busName);
+        Logger.info("Tray", "StatusNotifierItem registered as " + busName
+                + (menu != null ? " (with DBusMenu)" : " (without DBusMenu)"));
     }
 
     /** Releases the D-Bus name and disconnects. The tray icon disappears with it. */
@@ -173,9 +189,12 @@ public class StatusNotifierTray implements StatusNotifierItem {
         properties.put("IconThemePath", new Variant<>(""));
         properties.put("IconName",      new Variant<>(""));
         properties.put("IconPixmap",    new Variant<>(pixmaps, "a(iiay)"));
-        // No DBusMenu is exported on purpose: KDE then calls ContextMenu(x, y) instead,
-        // which lets the existing Swing menus be reused as-is.
-        properties.put("Menu",          new Variant<>("/NO_DBUSMENU"));
+        // Must be a D-Bus object path (type "o"), not a string: hosts read it with
+        // QDBusObjectPath and would otherwise see an empty path and conclude that no
+        // menu exists. "/NO_DBUSMENU" is the agreed value for "no menu, call
+        // ContextMenu(x, y) instead".
+        properties.put("Menu", new Variant<ObjectPath>(
+                new ObjectPath("s", menu != null ? SwingDBusMenu.MENU_PATH : NO_MENU), "o"));
         properties.put("ItemIsMenu",    new Variant<>(Boolean.FALSE));
         return properties;
     }
