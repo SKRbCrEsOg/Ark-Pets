@@ -43,6 +43,10 @@ public class ArkPets extends InputApplicationAdaptor {
     public TransitionVector2 windowPosition; // Window Position Easing
 
     private HWndCtrl hWndMine;
+    /** Whether the "own window not listed yet" notice has already been logged. */
+    private boolean windowStylePending = false;
+    /** Set when window styling has been given up on, so it is not retried forever. */
+    private boolean windowStyleUnavailable = false;
     private List<? extends HWndCtrl> hWndList;
     private final Cached<HWndCtrl> hWndTopmostGetter;
     private final Cached<Boolean> hWndTransparentSetter;
@@ -63,7 +67,7 @@ public class ArkPets extends InputApplicationAdaptor {
         hWndTopmostGetter.setCacheAgeProducer(() -> 8.0 / getReducedFPS());
 
         isFocused = new Cached<>();
-        isFocused.setValueProducer(() -> hWndMine.isForeground());
+        isFocused.setValueProducer(() -> hWndMine != null && hWndMine.isForeground());
         isFocused.setCacheAgeProducer(() -> 4.0 / getReducedFPS());
 
         hWndTransparentSetter = new Cached<>();
@@ -110,13 +114,9 @@ public class ArkPets extends InputApplicationAdaptor {
         windowPosition.reset(plane.getX(), -(cha.camera.getHeight() + plane.getY()) + offsetY);
         windowPosition.setToEnd();
 
-        // 5.Window style setup
-        hWndMine = WindowSystem.findWindow(null, APP_TITLE);
-        hWndMine.attachGLFWWindow((Lwjgl3Graphics) Gdx.graphics);
-        if (config.window_style_topmost)
-            hWndMine.setTopmost(true);
-        if (config.window_style_toolwindow)
-            hWndMine.setTaskbar(false);
+        // 5.Window style setup. The window is not in the compositor's list yet at this point -
+        // see applyWindowStyleWhenAvailable(), which finishes the job from render().
+        applyWindowStyleWhenAvailable();
         updateWindow();
 
         // 6.Tray icon setup
@@ -132,6 +132,10 @@ public class ArkPets extends InputApplicationAdaptor {
     public void render() {
         if (performanceSampler != null)
             performanceSampler.beginFrame();
+
+        // 0.Finish the window style setup that create() could not complete: the compositor only
+        // lists this window once the first buffer has been committed, which is after create().
+        applyWindowStyleWhenAvailable();
 
         // 1.Render the next frame.
         cha.render();
@@ -397,6 +401,47 @@ public class ArkPets extends InputApplicationAdaptor {
                     }
         }
         return null;
+    }
+
+    /** Finds this pet's own window through the platform integration.
+     * <p>
+     * The GLFW window exists by the time {@link #create()} runs, but the compositor only takes it
+     * into its window list once the client has committed its first buffer - which happens after
+     * {@code create()} returns. A single query there can therefore never succeed, and the caller
+     * used to dereference the null it got back, which took the whole pet down. (On KDE the
+     * subsequent {@code glfwTerminate()} then faulted inside {@code wl_display_disconnect()}, so
+     * the crash report pointed at libwayland and hid the real site.)
+     * <p>
+     * Rather than block {@code create()} waiting for something that cannot arrive yet, this is
+     * retried from {@link #render()} until the window shows up.
+     * @return The window, or null if the compositor does not know about it yet.
+     */
+    private HWndCtrl findOwnWindow() {
+        return WindowSystem.findWindow(null, APP_TITLE);
+    }
+
+    /** Applies the configured window styles once this pet's own window becomes visible to the
+     * compositor. Safe to call every frame; does nothing after it has succeeded.
+     */
+    private void applyWindowStyleWhenAvailable() {
+        if (hWndMine != null || windowStyleUnavailable)
+            return;
+        hWndMine = findOwnWindow();
+        if (hWndMine == null) {
+            if (!windowStylePending) {
+                windowStylePending = true;
+                Logger.info("App", "Own window is not in the compositor's list yet; "
+                        + "window styling will be applied once it is.");
+            }
+            return;
+        }
+        Logger.info("App", "Own window appeared; applying window styling.");
+        windowStylePending = false;
+        hWndMine.attachGLFWWindow((Lwjgl3Graphics) Gdx.graphics);
+        if (config.window_style_topmost)
+            hWndMine.setTopmost(true);
+        if (config.window_style_toolwindow)
+            hWndMine.setTaskbar(false);
     }
 
     private HWndCtrl refreshWindowIndex() {
