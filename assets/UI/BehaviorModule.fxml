@@ -60,6 +60,7 @@
                     <Label text="任务栏高度（下边界距离）"/>
                     <JFXSlider fx:id="configDeployMarginBottom"/>
                     <Label fx:id="configDeployMarginBottomValue" text="0"/>
+                    <JFXButton fx:id="configDeployMarginBottomHelp"/>
                 </HBox>
                 <HBox>
                     <Label text="初始部署位置"/>

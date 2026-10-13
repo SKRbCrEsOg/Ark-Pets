@@ -61,6 +61,8 @@ public final class BehaviorModule implements Controller<ArkHomeFX> {
     @FXML
     private Label configDeployMarginBottomValue;
     @FXML
+    private Button configDeployMarginBottomHelp;
+    @FXML
     private Button toggleConfigDeployPosition;
     @FXML
     private HBox wrapperConfigDeployPosition;
@@ -201,6 +203,21 @@ public final class BehaviorModule implements Controller<ArkHomeFX> {
                     app.config.display_margin_bottom = setupDeployMarginBottom.getValidatedValue();
                     app.config.save();
                 });
+        new HelpHandbookEntrance(app.body, configDeployMarginBottomHelp) {
+            @Override
+            public Handbook getHandbook() {
+                return new ControlHelpHandbook(
+                        (Labeled) configDeployMarginBottom.getParent().getChildrenUnmodifiable().get(0)) {
+                    @Override
+                    public String getContent() {
+                        return "把桌宠站立的地板向上抬高这么多像素，用于修正桌宠陷入任务栏、或悬浮在半空中的情况。"
+                                + "留 0 表示由系统报告的可用区域自动决定。"
+                                + "当任务栏或状态栏没有正确向系统报告自己的高度时（例如某些 Wayland 外壳自绘的栏），"
+                                + "桌宠会一路走到屏幕最底端、被栏挡住，此时把这里设成该栏的高度即可。";
+                    }
+                };
+            }
+        };
 
         GuiPrefabs.bindToggleAndWrapper(toggleConfigDeployPosition, wrapperConfigDeployPosition, durationFast);
         DotPickerSetup setupDeployPosition = new DotPickerSetup(configDeployPosition);

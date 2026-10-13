@@ -25,6 +25,18 @@
    </sub>
 </div>
 
+> **关于本仓库**
+>
+> 这是 [isHarryh/Ark-Pets](https://github.com/isHarryh/Ark-Pets) 的 **Linux 移植分支**（`v4.x-cross`），
+> 也是 **Linux 发行包的发布来源**。Windows 版本请前往[上游仓库](https://github.com/isHarryh/Ark-Pets/releases)。
+>
+> Linux 支持包含：KWin 集成插件（窗口控制/置顶/去边框）、StatusNotifierItem + DBusMenu 托盘、
+> 光标主题跟随桌面设置、XDG 自启动，以及针对 Wayland 合成器的适配。
+>
+> - **安装流程**见[下文](#在-linuxkde-plasma上安装)
+> - **应用本体**由 [GitHub Actions](.github/workflows/build-linux.yml) 构建（x86_64 + aarch64）
+> - **KWin 插件**必须在本机编译（与本机 KWin ABI 绑定），见下文第二步
+
 ## 介 绍 <sub>Intro</sub>
 
 ### 实现的功能
@@ -87,7 +99,8 @@
 
 ## 使用方法 <sub>Usage</sub>
 
-目前仅支持 Windows 7 及以上的图形操作系统（Linux aarch64 + KDE 的实验性支持见下文）。
+目前支持 Windows 7 及以上的图形操作系统；**Linux（KDE Plasma，x86_64 与 aarch64）为实验性支持**，
+见[下文](#在-linuxkde-plasma上安装)。
 
 ### 快速上手
 
@@ -101,22 +114,130 @@
 > - 若无法在软件内下载模型，可以访问 [ArkModels 模型仓库](https://github.com/isHarryh/Ark-Models) 页面，手动下载模型压缩包后，在 “模型库管理” 面板点击 “导入压缩包” 按钮后导入模型。
 > - 如需将软件从 v2.x 或 v3.x 更新到更高版本，无需预先手动卸载，直接运行新版安装包即可。
 
-### 在 Linux（aarch64 + KDE Plasma）上安装
+### 在 Linux（KDE Plasma）上安装
 
-> 实验性支持，已在 Debian 13 (aarch64) + KDE Plasma 6 (Wayland) 上验证。
+> **实验性支持。** 已在 Debian forky/sid (**x86_64**) 与 Debian 13 (**aarch64**) + KDE Plasma 6.7 /
+> KWin 6.7 / Wayland 上验证。完整的步骤、验证方法与故障排查见 [`INSTALL.md`](https://github.com/SKRbCrEsOg/Ark-Pets/releases)。
 
-1. 下载发行包 `ArkPets-v3.13.1.zip`（自带运行时，无需系统 Java）、KWin 集成插件 `ArkPetsIntegration2.so` 与安装脚本 `install-arkpets.sh`。
-2. 运行安装脚本（可选 `--with-demo-model` 附带演示模型、`--autostart` 开机自启）：
+**x86_64 与 aarch64 的发行包是分开的，请按自己的架构选择：**
 
-   ```bash
-   ./install-arkpets.sh --with-demo-model
-   ```
+| 架构 | 发行包 |
+|:--|:--|
+| x86_64（Intel / AMD） | [最新 x86_64 发行包](https://github.com/SKRbCrEsOg/Ark-Pets/releases?q=x86_64) |
+| aarch64（ARM64） | [最新 aarch64 发行包](https://github.com/SKRbCrEsOg/Ark-Pets/releases?q=aarch64) |
 
-   脚本会解压程序、生成配置（`window_system=KWIN`）、安装 KWin 插件并生成启动脚本。
-3. **注销并重新登录（或重启）一次**，让 KWin 加载集成插件。
-4. 启动桌宠：`~/.local/opt/ArkPets/start-arkpets.sh`；打开启动器以下载 / 选择模型、调整设置：`~/.local/opt/ArkPets/bin/ArkPets`。
+#### 前置条件
 
-> 也可手动安装：解压 zip 后，将插件复制到 `$(qtpaths6 --query QT_INSTALL_PLUGINS)/kwin/plugins/`，并在配置文件中将 `window_system` 设为 `KWIN`。
+- **KDE Plasma，Wayland 会话**（X11 会话下窗口控制不可用）
+- 系统已装 **Qt 6**（提供 `qtpaths6`、`qdbus6`）
+- 安装时需要 **`sudo`**（写入 Qt 插件目录）；日常运行不需要
+
+#### 一、下载
+
+从上面的发行包页面下载这三个文件（`INSTALL.md` 也在同一页面，建议一并下载）：
+
+| 文件 | 说明 |
+|:--|:--|
+| `ArkPets-v3.13.1.zip` | 应用本体，**自带 JRE**，不需要系统 Java |
+| `install-arkpets.sh` | 安装脚本 |
+| `build-kwin-plugin.sh` | KWin 集成插件的本机编译脚本 |
+
+#### 二、编译 KWin 集成插件（**这一步不能跳过**）
+
+ArkPets 通过一个 KWin 插件来获取窗口位置、置顶桌宠、去掉边框。**该插件与本机 KWin 是 ABI 绑定的** ——
+它链接 libkwin，而 KWin 的 C++ 类在版本之间会增删成员，libkwin 也只导出头文件所声明的一部分符号
+（例如 `KWin::LayerShellV1Window` 完全没有导出符号）。**所以不存在适用于所有 KWin 版本的预编译插件。**
+
+发行包里附带的 `ArkPetsIntegration2.so` 只是维护者在 KWin 6.7.4 上的参考构建。
+**只要你的 KWin 不是这个版本，就必须在本机编译**：
+
+```bash
+bash build-kwin-plugin.sh
+```
+
+脚本会自动检测你的 KWin 版本与所需依赖；缺依赖时会按发行版打印准确的安装命令（Debian/Ubuntu、
+Arch、Fedora、openSUSE、Gentoo、Void），也可以用 `--install-deps` 让它直接安装。
+
+编译完成后，脚本会做一件关键的事 —— **ABI 校验**：检查插件未定义的每一个 `KWin::` 符号，都能在
+本机 libkwin 的导出表里找到。**编译成功不代表能加载**，这一步才是真正能抓出「`kwin-dev` 过期或与
+运行中的 KWin 不匹配」的检查：
+
+```
+==> ABI check against /usr/lib/x86_64-linux-gnu/libkwin.so.6
+    21 KWin symbol(s) required by the plugin
+    all of them are exported - the plugin matches this KWin
+```
+
+看到这一行才算成功。若报出缺失符号，说明 `kwin-dev` 与运行中的 KWin 不一致，先修好依赖再继续。
+
+编译产物在 `build/bin/kwin/plugins/ArkPetsIntegration2.so`，把它复制到安装脚本旁边：
+
+```bash
+cp build/bin/kwin/plugins/ArkPetsIntegration2.so .
+```
+
+> 不想手动跑这一步，也可以直接把 `--install` 交给脚本：`bash build-kwin-plugin.sh --install`，
+> 它会自行安装到 Qt 插件目录并请求运行中的 KWin 加载。
+
+#### 三、安装
+
+```bash
+bash install-arkpets.sh --with-demo-model
+```
+
+脚本会做这些事：解压应用到 `~/.local/opt/ArkPets/`、写入配置（`window_system=KWIN`）、
+把 `ArkPetsIntegration2.so` 装到 `$(qtpaths6 --query QT_INSTALL_PLUGINS)/kwin/plugins/`、
+生成启动脚本与应用菜单项。
+
+常用选项：
+
+| 选项 | 作用 |
+|:--|:--|
+| `--with-demo-model` | 附带阿米娅演示模型，装完即可直接启动 |
+| `--autostart` | 创建开机自启项 |
+| `--no-plugin` | 只装应用本体，不动 KWin 插件 |
+| `--plugin <path>` | 指定要安装的插件路径 |
+| `--fresh` | 从零开始（丢弃现有模型、日志与配置） |
+
+> **重复运行不会丢失用户数据。** 脚本会先把 `ArkPetsConfig.json`、模型与日志挪到一旁，装完再放回。
+> 因此升级时直接重跑即可。
+
+#### 四、注销并重新登录
+
+KWin 只在启动时加载插件，**必须注销重登（或重启）一次**。
+
+#### 五、启动
+
+```bash
+~/.local/opt/ArkPets/start-arkpets.sh        # 只启动桌宠
+~/.local/opt/ArkPets/start-launcher.sh       # 打开启动器（下载/选择模型、改设置）
+```
+
+首次使用需要模型：在启动器的「模型」页面点「模型库管理 → 下载模型」。
+若下载失败，可到 [ArkModels 模型仓库](https://github.com/isHarryh/Ark-Models) 手动下载压缩包后用
+「导入压缩包」导入。
+
+#### 验证安装是否成功
+
+```bash
+qdbus6 org.kde.KWin /ArkPets org.kde.KWin.ArkPets.List    # 应返回当前窗口列表而非报错
+```
+
+能返回窗口列表即说明插件工作正常。桌宠启动后可用这条命令确认它已被正确接管
+（应看到 `keepAbove` / `skipTaskbar` 生效）：
+
+```bash
+qdbus6 --literal org.kde.KWin /ArkPets org.kde.KWin.ArkPets.List | grep ArkPets
+```
+
+#### 遇到问题时
+
+- **桌宠沉进任务栏 / 悬浮在半空中**：在启动器「行为 → 位置」里调大「任务栏高度（下边界距离）」，
+  点旁边的 `?` 有说明。这是某些外壳（如自绘的 Wayland 栏）没有正确向系统报告高度导致的。
+- **桌宠不置顶 / 任务栏里有图标**：确认「选项 → 高级设置」里的「桌宠窗口置顶」已勾选；
+  若勾了仍无效，通常是插件没加载成功，先做上面的「验证安装是否成功」。
+- **插件加载失败**：`kwin-dev` 与运行中的 KWin 版本不一致是最常见原因，重跑第二步。
+- 其余问题见发行包内的 `INSTALL.md` 第五节「故障排查」。
 
 ### 更多特性
 

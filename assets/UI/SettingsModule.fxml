@@ -125,11 +125,6 @@
                     <JFXCheckBox fx:id="configWindowToolwindow" mnemonicParsing="false" text="桌宠作为后台程序启动"/>
                     <JFXButton fx:id="configWindowToolwindowHelp"/>
                 </HBox>
-                <HBox spacing="20.0">
-                    <Label text="任务栏高度（像素）"/>
-                    <JFXTextField fx:id="configMarginBottom" prefWidth="80.0"/>
-                    <JFXButton fx:id="configMarginBottomHelp"/>
-                </HBox>
                 <HBox>
                     <JFXCheckBox fx:id="configEcoMode" mnemonicParsing="false" text="长时间未交互时降低帧率"/>
                     <JFXCheckBox fx:id="configTelemetry" mnemonicParsing="false" text="上传匿名使用数据"/>
