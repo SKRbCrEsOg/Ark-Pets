@@ -193,6 +193,12 @@ public final class BehaviorModule implements Controller<ArkHomeFX> {
             app.config.save();
         });
 
+        // The stylesheet sizes every Label in a config row to the same 175px column so the field
+        // labels line up, but this one is a value readout, not a label. Left at 175px the row came
+        // to about 510px against a ~440px content area, and whatever sat at the end of it - the
+        // help button added below - was clipped away. An inline style outranks the stylesheet.
+        configDeployMarginBottomValue.setStyle("-fx-pref-width: 56px;");
+
         SliderSetup<Integer> setupDeployMarginBottom = new SimpleIntegerSliderSetup(configDeployMarginBottom);
         setupDeployMarginBottom
                 .setDisplay(configDeployMarginBottomValue, "%d px", "像素 (pixel)")
