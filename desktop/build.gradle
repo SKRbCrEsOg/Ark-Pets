@@ -14,6 +14,11 @@ processResources {
             "**/models_enemies/**",
             "**/models/**",
             "**/logs/**",
+            // Runtime scratch space. Const.tempDirPath is the relative "temp/", and the run/debug
+            // tasks set workingDir to this very assets directory, so running the app locally drops
+            // extracted fonts into assets/temp - which would then be packaged by every later
+            // distJar, adding ~17 MB of duplicates that the release archives used to carry.
+            "**/temp/**",
             "models_data.json"
     ]
 }
@@ -94,6 +99,9 @@ tasks.register("distJar", Jar) {
     }
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    // Belt and braces: processResources already drops assets/temp, but a stale build/resources
+    // from an older checkout can still carry it, and it is the artifact that matters.
+    exclude "temp/**"
     manifest {
         attributes 'Main-Class': mainClassName
     }
