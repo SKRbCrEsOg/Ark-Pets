@@ -40,11 +40,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The JDK version is not cosmetic. build.gradle switches JavaFX to 23.0.1 on Linux
+        # aarch64, because JavaFX publishes no linux-aarch64 artifacts before that; JavaFX 23
+        # is compiled for Java 21, so it cannot be used from JDK 17 - the build fails with
+        # "class file has wrong version 65.0". x86_64 stays on 17, which is what the project
+        # and the upstream workflow target.
         include:
           - arch: x86_64
             runner: ubuntu-24.04
+            java: '17'
           - arch: aarch64
             runner: ubuntu-24.04-arm
+            java: '21'
 
     env:
       ARTIFACT_NAME: ArkPets-linux-${{ matrix.arch }}
@@ -55,6 +62,7 @@ jobs:
           echo "ref:  ${{ github.ref }}"
           echo "sha:  ${{ github.sha }}"
           echo "arch: ${{ matrix.arch }}"
+          echo "jdk:  ${{ matrix.java }}"
           uname -a
 
       - name: Checkout
@@ -63,7 +71,7 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: ${{ matrix.java }}
           distribution: 'liberica'
 
       # jlink runs objcopy over the runtime image it produces, so binutils has to be present;
