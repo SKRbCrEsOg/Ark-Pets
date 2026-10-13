@@ -1,0 +1,108 @@
+name: Build (Linux)
+
+# Builds the ArkPets application itself (the launcher and the pet) on Linux, for the port that
+# lives on the v4.x-cross branch.
+#
+# Scope note: this workflow deliberately does NOT build the KWin integration plugin. A KWin
+# plugin is ABI-bound to the exact KWin it is compiled against - libkwin exports only part of
+# what its headers declare, and members move between releases - so a plugin built on a GitHub
+# runner only loads into the KWin that happens to match that runner's distribution. It is built
+# on the target machine instead, by KWin/build-kwin-plugin.sh in Ark-Pets-Integration, which
+# also verifies the result against the local libkwin.
+#
+# The application has no such constraint: the fat jar carries every platform's LWJGL natives and
+# the app-image only depends on the architecture of the bundled runtime, so both are built here.
+
+on:
+  push:
+    branches:
+      - 'v4.x-cross'
+      - 'v4.x*'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - 'v4.x-cross'
+      - 'v4.x*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Linux ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+
+    env:
+      ARTIFACT_NAME: ArkPets-linux-${{ matrix.arch }}
+
+    steps:
+      - name: Show meta info
+        run: |
+          echo "ref:  ${{ github.ref }}"
+          echo "sha:  ${{ github.sha }}"
+          echo "arch: ${{ matrix.arch }}"
+          uname -a
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'liberica'
+
+      # jlink runs objcopy over the runtime image it produces, so binutils has to be present;
+      # without it the jlink task fails with "Cannot run program objcopy".
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends binutils
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Build
+        # distJar produces the fat jar, jpackage+jlink the app-image, distZip the archive.
+        # distAll is deliberately not used: it also runs distExe, which needs Inno Setup.
+        run: gradle desktop:distJar desktop:distZip --no-daemon --stacktrace
+        env:
+          ORG_GRADLE_PROJECT_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+
+      - name: Report what was produced
+        run: |
+          ls -la desktop/build/dist/
+          for f in desktop/build/dist/*.jar desktop/build/dist/*.zip; do
+            [ -e "$f" ] || continue
+            echo "$(sha256sum "$f")"
+          done
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-jar
+          path: desktop/build/dist/*.jar
+          if-no-files-found: error
+
+      - name: Upload app-image
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-zip
+          path: desktop/build/dist/*.zip
+          if-no-files-found: error
