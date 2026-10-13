@@ -113,6 +113,10 @@ public final class SettingsModule implements Controller<ArkHomeFX> {
     @FXML
     private Button configWindowToolwindowHelp;
     @FXML
+    private TextField configMarginBottom;
+    @FXML
+    private Button configMarginBottomHelp;
+    @FXML
     private CheckBox configEcoMode;
     @FXML
     private ComboBox<NamedItem<String>> configWindowSystem;
@@ -465,6 +469,35 @@ public final class SettingsModule implements Controller<ArkHomeFX> {
             }
         };
 
+        // Floor offset. ArkPets works out the standable floor from the window and panel
+        // information the compositor reports; panels that reserve their space in a way the
+        // compositor cannot express (some Quickshell/layer-shell bars do) are invisible to it,
+        // and the pet then walks at the very bottom of the screen, behind the panel.
+        configMarginBottom.setText(String.valueOf(app.config.display_margin_bottom));
+        configMarginBottom.setTextFormatter(new TextFormatter<>(change ->
+                change.getControlNewText().matches("\\d{0,4}") ? change : null));
+        configMarginBottom.setOnAction(e -> applyMarginBottom());
+        configMarginBottom.focusedProperty().addListener((observable, wasFocused, isFocused) -> {
+            if (!isFocused)
+                applyMarginBottom();
+        });
+        new HelpHandbookEntrance(app.body, configMarginBottomHelp) {
+            @Override
+            public Handbook getHandbook() {
+                return new ControlHelpHandbook((Labeled) configMarginBottom.getParent()
+                        .getChildrenUnmodifiable().get(0)) {
+                    @Override
+                    public String getContent() {
+                        return "把桌宠站立的地板向上抬高这么多像素，用于修正桌宠陷入任务栏或悬浮在半空中的情况。"
+                                + "填 0 表示由系统报告的可用区域自动决定。"
+                                + "当任务栏或状态栏没有正确向系统报告自己的高度时（例如某些 Wayland 外壳自绘的栏），"
+                                + "桌宠会走到屏幕最底端、被栏挡住，此时把这里填成该栏的高度即可。"
+                                + "在 KDE Plasma 上可以用「系统设置 → 窗口管理 → 窗口规则」或直接测量栏的高度。";
+                    }
+                };
+            }
+        };
+
         configEcoMode.setSelected(app.config.eco_mode);
         configEcoMode.setOnAction(e -> {
             app.config.eco_mode = configEcoMode.isSelected();
@@ -516,6 +549,22 @@ public final class SettingsModule implements Controller<ArkHomeFX> {
                     "当前系统环境可以顺利运行 ArkPets。",
                     null).show();
         }).start());
+    }
+
+    /** Commits the floor offset the user typed, clamping it to something sane and echoing the
+     * accepted value back so the field never shows something that was not stored.
+     */
+    private void applyMarginBottom() {
+        int value;
+        try {
+            value = Integer.parseInt(configMarginBottom.getText().trim());
+        } catch (NumberFormatException e) {
+            value = 0;
+        }
+        // A floor higher than the screen itself makes no sense; 4096 is well past any display.
+        app.config.display_margin_bottom = Math.max(0, Math.min(4096, value));
+        configMarginBottom.setText(String.valueOf(app.config.display_margin_bottom));
+        app.config.save();
     }
 
     private static ArrayList<NamedItem<String>> getWindowSystemItems() {
